@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  MSKCluster:
+    Type: String
+  VPCId:
+    Type: String
+    Description: 'The VPC ID'
+  PrivateSubnetMSKOne:
+    Type: String
+    Description: 'Private Subnet One'
+  PrivateSubnetMSKTwo:
+    Type: String
+    Description: 'Private Subnet Two'
+  SecurityGroup:
+    Type: String
+    Description: 'Security Group'
+  MSKTopic:
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  TopicConsumerFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      InlineCode: |
+            exports.handler = async (event) => {
+                // Iterate through keys
+                for (let key in event.records) {
+                  console.log('Key: ', key)
+                  // Iterate through records
+                  event.records[key].map((record) => {
+                    console.log('Record: ', record)
+                    // Decode base64
+                    const msg = Buffer.from(record.value, 'base64').toString()
+                    console.log('Message:', msg)
+                  }) 
+                }
+            }
+      Handler: index.handler
+      Runtime: nodejs16.x
+      Events:
+        MSKEvent:
+          Type: MSK
+          Properties:
+            StartingPosition: LATEST
+            Stream: !Ref MSKCluster
+            Topics:
+              - !Ref MSKTopic
+      Policies:
+      - AWSLambdaMSKExecutionRole
+      VpcConfig:
+        SubnetIds:
+          - !Ref PrivateSubnetMSKOne
+          - !Ref PrivateSubnetMSKTwo
+        SecurityGroupIds:
+          - !Ref SecurityGroup
